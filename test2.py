@@ -29,31 +29,26 @@ class particle:
 		self.size = size #Radius for circle and width and height for rectangle
 		self.color = color
 		self.shape = shape  #String with the name of the shape
-		self.f_net = vect3d(0,0,0)   #Property to keep track of net force on particle
-		self.pos_old = vect3d(0,0,0)
-		self.vel_old = vect3d(0,0,0)
-		self.f_net_old = vect3d(0,0,0)
-		self.k1 = vect3d(0,0,0)
-		self.k2 = vect3d(0,0,0)
-		self.k3 = vect3d(0,0,0)
-		self.k4 = vect3d(0,0,0)
-		self.L1 = vect3d(0,0,0)
-		self.L2 = vect3d(0,0,0)
-		self.L3 = vect3d(0,0,0)
-		self.L4 = vect3d(0,0,0)
+		self.f_net = vect2d(0,0)   #Property to keep track of net force on particle
+		self.pos_old = vect2d(0,0)
+		self.vel_old = vect2d(0,0)
+		self.f_net_old = vect2d(0,0)
+		self.k1 = vect2d(0,0)
+		self.k2 = vect2d(0,0)
+		self.k3 = vect2d(0,0)
+		self.k4 = vect2d(0,0)
+		self.L1 = vect2d(0,0)
+		self.L2 = vect2d(0,0)
+		self.L3 = vect2d(0,0)
+		self.L4 = vect2d(0,0)
 		self.drag_coeff = 0.000001   #Scaling number for drag force
 		self.cor = .97     #Coefficient of restitution
 		self.rod_connection={}  #NEW: Dictionary of all rod constraint connections
 		self.geom = []
 
 
-	def draw(self,screen):
-            pygame.draw.circle(self.screen, particle.color, (int(particle.pos.x/2), int(particle.pos.y/2)), particle.size, 1)
-            pygame.draw.circle(self.screen, particle.color, (int(particle.pos.x/2) +250, int(particle.pos.z/2)), particle.size, 1)
-            pygame.draw.circle(self.screen, particle.color, (int(particle.pos.y/2), int(particle.pos.z/2) + 250), particle.size, 1)
-            
-
-		#pygame.draw.circle(screen, self.color, (int(self.pos.x), int(self.pos.y)), self.size, 1)
+	def draw(self,screen, parent_pos=vect2d(0,0)):
+		pygame.draw.circle(screen, self.color, (int(self.pos.x+parent_pos.x), int(self.pos.y+parent_pos.y)), self.size, 1)
 
 	def add_force(self,force):
 		"""Add force to the net force vector for each particle"""
@@ -65,7 +60,7 @@ class particle:
 
 		Call this at the start of each time step to reset net forces for each particle
 		"""
-		self.f_net = vect3d(0,0,0) 
+		self.f_net = vect2d(0,0) 
 
 
 	def get_force(self):
@@ -75,7 +70,7 @@ class particle:
 	def set_pos(self,new_pos):
 		"""Set the position of the particle
 
-		Make sure that new_pos is a vect3d obj,0ect
+		Make sure that new_pos is a vect2d object
 		"""
 		self.pos = new_pos
 
@@ -83,69 +78,21 @@ class particle:
 		self.geom.setPosition((self.pos.x, self.pos.y, 0))
 
 class rectangle(particle):
-	def __init__(self, pos, vel, width=20, height=20, length=20, theta=0, phi = 0, omega=0, mass=1.0, shape="rectangle", color=(255, 0, 255)):
-		size = vect3d(width/2, height/2, length/2).mag()
+	def __init__(self, pos, vel, width=20, height=20, theta=0, omega=0, mass=1.0, shape="rectangle", color=(255, 0, 255)):
+		size = vect2d(width/2, height/2).mag()
 		particle.__init__(self, pos, vel, mass, size, shape, color)
 		self.width = width
 		self.height = height
-		self.length = length
 		self.theta = theta
-		self.phi = phi
 		self.omega = omega
-		self.local_x_axis = vect3d(math.cos(theta), math.sin(theta),0)
-		self.local_y_axis = vect3d(-math.sin(theta), math.cos(theta),0)
-		self.local_z_axis = vect3d(0,0,1)
-		self.torque = vect3d(0,0,0)
-		self.torque_old = vect3d(0,0,0)
+		self.local_x_axis = vect2d(math.cos(theta), math.sin(theta))
+		self.local_y_axis = vect2d(-math.sin(theta), math.cos(theta))
+		self.torque = vect2d(0,0)
+		self.torque_old = vect2d(0,0)
 		self.test = False;
-		self.vertex = [vect3d(-width/2, -height/2, -length/2), vect3d(width/2, -height/2, -length/2),
-					   vect3d(width/2, -height/2, length/2), vect3d(-width/2, -height/2, length/2),
-					   vect3d(-width/2, height/2, -length-2), vect3d(width/2, height/2, -length/2),
-					   vect3d(width/2, height/2, length/2), vect3d(-width/2, height/2, length/2)]
 
 	def draw(self, screen):
-		vCorners = self.find_corners()
-					#top face
-		xy_proj = [[vCorners[0].x + self.pos.x, vCorners[0].y + self.pos.y],
-					[vCorners[1].x + self.pos.x, vCorners[1].y + self.pos.y],
-					[vCorners[2].x + self.pos.x, vCorners[2].y + self.pos.y],
-					[vCorners[3].x + self.pos.x, vCorners[3].y + self.pos.y],
-					[vCorners[0].x + self.pos.x, vCorners[0].y + self.pos.y],
-					#Bottom face
-					[vCorners[4].x + self.pos.x, vCorners[4].y + self.pos.y],
-					[vCorners[5].x + self.pos.x, vCorners[5].y + self.pos.y],
-					[vCorners[6].x + self.pos.x, vCorners[6].y + self.pos.y],
-					[vCorners[7].x + self.pos.x, vCorners[7].y + self.pos.y],
-					[vCorners[4].x + self.pos.x, vCorners[4].y + self.pos.y],
-					#Front face
-					[vCorners[3].x + self.pos.x, vCorners[3].y + self.pos.y],
-					[vCorners[2].x + self.pos.x, vCorners[2].y + self.pos.y],
-					[vCorners[6].x + self.pos.x, vCorners[6].y + self.pos.y],
-					[vCorners[7].x + self.pos.x, vCorners[7].y + self.pos.y],
-					[vCorners[3].x + self.pos.x, vCorners[3].y + self.pos.y],
-					#Back face
-					[vCorners[0].x + self.pos.x, vCorners[0].y + self.pos.y],
-					[vCorners[1].x + self.pos.x, vCorners[1].y + self.pos.y],
-					[vCorners[5].x + self.pos.x, vCorners[5].y + self.pos.y],
-					[vCorners[4].x + self.pos.x, vCorners[4].y + self.pos.y],
-					[vCorners[0].x + self.pos.x, vCorners[0].y + self.pos.y],
-					#Left face
-					[vCorners[0].x + self.pos.x, vCorners[0].y + self.pos.y],
-					[vCorners[3].x + self.pos.x, vCorners[3].y + self.pos.y],
-					[vCorners[7].x + self.pos.x, vCorners[7].y + self.pos.y],
-					[vCorners[4].x + self.pos.x, vCorners[4].y + self.pos.y],
-					[vCorners[0].x + self.pos.x, vCorners[0].y + self.pos.y],
-					#Right face
-					[vCorners[2].x + self.pos.x, vCorners[2].y + self.pos.y],
-					[vCorners[1].x + self.pos.x, vCorners[1].y + self.pos.y],
-					[vCorners[5].x + self.pos.x, vCorners[5].y + self.pos.y],
-					[vCorners[6].x + self.pos.x, vCorners[6].y + self.pos.y],
-					[vCorners[2].x + self.pos.x, vCorners[2].y + self.pos.y],
-		]
-
-		pygame.draw.aalines(screen, self.color, False, xy_proj)
-		#pygame.draw.aalines(screen, self.color, False, xz_proj)
-		#pygame.draw.aalines(screen, self.color, False, yz_proj)
+		pygame.draw.aalines(screen, self.color, True, self.find_corners(), 1)
 		#pygame.draw.circle(screen, self.color, (int(self.pos.x), int(self.pos.y)), (int(self.size)), 1)
 		#Draw the local x and y axis
 		#pygame.draw.aaline(screen, (255,0,0), [self.pos.x, self.pos.y], [self.pos.x + (self.width/2 * self.local_x_axis).x, self.pos.y + (self.width/2 * self.local_x_axis).y], True)
@@ -156,36 +103,18 @@ class rectangle(particle):
 		self.m_inv = 1/mass
 
 	def find_corners(self):
-		#Find the rotated vertices
-		vCorners = [None]*8
-		for i in range(len(self.vertex)):
-			vCorners[i] = self.rotate(self.vertex[i])
-
-		"""
 		lX = self.width/2*self.local_x_axis
 		lY = self.height/2*self.local_y_axis
-		lZ = self.length/2*self.local_z_axis
 
-		vCorners = [-lX -lY, lX-lY, lX+lY, -lX+lY]"""
+		vCorners = [-lX -lY, lX-lY, lX+lY, -lX+lY]
 		corners = [[vCorners[0].x + self.pos.x, vCorners[0].y + self.pos.y],
 					[vCorners[1].x + self.pos.x, vCorners[1].y + self.pos.y],
 					[vCorners[2].x + self.pos.x, vCorners[2].y + self.pos.y],
-					[vCorners[3].x + self.pos.x, vCorners[3].y + self.pos.y],
-					[vCorners[4].x + self.pos.x, vCorners[4].y + self.pos.y],
-					[vCorners[5].x + self.pos.x, vCorners[5].y + self.pos.y],
-					[vCorners[6].x + self.pos.x, vCorners[6].y + self.pos.y],
-					[vCorners[7].x + self.pos.x, vCorners[7].y + self.pos.y]
+					[vCorners[3].x + self.pos.x, vCorners[3].y + self.pos.y]
 		]
-				
-		return vCorners
+					
+		return corners
 
-	def rotate(self, vertex):
-		x = vertex.x * math.cos(self.theta) + vertex.y * math.sin(self.theta) + vertex.z * 0
-		y = vertex.x * -math.sin(self.theta) + vertex.y * math.cos(self.theta) + vertex.z * 0
-		z = vertex.z
-		result = vect3d(x,y,z)
-
-		return result
 
 	def add_torque(self, torque):
 		self.torque += torque
@@ -198,16 +127,82 @@ class rectangle(particle):
 
 	def update_rotation(self, dt):
 		self.theta += self.omega * dt
-		#self.local_x_axis = vect3d(mat,0h.cos(self.theta * math.pi/180), -math.sin(self.theta * math.pi/180))
-		#self.local_y_axis = vect3d(mat,0h.sin(self.theta * math.pi/180), math.cos(self.theta * math.pi/180))
-		self.local_x_axis = vect3d(math.cos(self.theta), math.sin(self.theta), 0)
-		self.local_y_axis = vect3d(-math.sin(self.theta), math.cos(self.theta),0)
+		#self.local_x_axis = vect2d(math.cos(self.theta * math.pi/180), -math.sin(self.theta * math.pi/180))
+		#self.local_y_axis = vect2d(math.sin(self.theta * math.pi/180), math.cos(self.theta * math.pi/180))
+		self.local_x_axis = vect2d(math.cos(self.theta), math.sin(self.theta))
+		self.local_y_axis = vect2d(-math.sin(self.theta), math.cos(self.theta))
 
 	def set_gcoord(self):
 		self.geom.setPosition((self.pos.x, self.pos.y, 0))
 		self.geom.setRotation([math.cos(self.theta), -math.sin(self.theta), 0, 
-							   math.sin(self.theta), math.cos(self.theta),0,
-							   0,0,1])
+							   math.sin(self.theta), math.cos(self.theta),0,0,0,1])
+
+class magnet(rectangle):
+	def __init__(self, pos):
+		rectangle.__init__(self, pos, vect2d(0,0), 100, 20)
+		self.magnet_strength = 0
+
+class coil(rectangle):
+	def __init__(self, pos):
+		rectangle.__init__(self, pos, vect2d(0,0), 150, 100)
+		self.num_loops = 4.55; #Had to add on 0.05 to get the last point entering the coil
+		self.wire = []
+		self.electrons = []
+		self.electron_path = []
+		
+		#Add visual representation for the wire not in the coil
+		r = vect2d(self.pos.x - self.width/2 + 5, self.pos.y + self.height/2)
+		width = 10
+		height = self.height
+		#Wire on the left
+		self.wire.append(rectangle(r, vect2d(0,0), width, height))
+		r = vect2d(self.pos.x + self.width/2 -5, self.pos.y + self.height/2)
+		#Wire on the right
+		self.wire.append(rectangle(r, vect2d(0,0), width, height))
+		r = vect2d(self.pos.x, self.pos.y + height-5)
+		#Wire on the bottom
+		self.wire.append(rectangle(r, vect2d(0,0), self.width, 10))
+		
+		#Set up the path
+		#path points for coil
+		for i in range(0,(int)(self.num_loops*20)):
+			self.electron_path.append(vect2d(i*(self.width-5)/(20*self.num_loops),
+					    ((self.height-10)/2) * -math.sin(i*2*math.pi/20)))
+		#add path points in the bottom wires
+		for i in range(0, 5):#Add 5 points along the wire on the right
+			self.electron_path.append(vect2d(self.width-10, 15 + i*(self.wire[1].height-15)/5))
+		for i in range(0,7):#Add 7 points along the wire on the bottom
+			self.electron_path.append(vect2d(self.wire[2].width-10 - i*(self.wire[2].width+10)/7,
+									 		 self.wire[0].height-5))
+		for i in range(0,5):#Add 5 points along the wire on the left
+			self.electron_path.append(vect2d(0, 15+i*(self.wire[0].height-15)/5))
+
+		#Add electrons to the system
+		num_electrons = 100
+		for i in range(0, num_electrons):
+			r = self.electron_path[(int)(i*len(self.electron_path)/num_electrons)]
+			r.x -= self.width/2 - 5
+			part = particle(r, vect2d(0,0), 1, 5)
+			self.electrons.append(part)
+
+	def draw(self, screen):
+		self.update()
+		rectangle.draw(self, screen)
+		for i in self.electrons:
+			i.draw(screen, self.pos)
+		for i in self.wire:
+			i.draw(screen)
+
+	def update(self):
+		r = vect2d(self.pos.x - self.width/2 + 5, self.pos.y + self.height/2)
+		width = 10
+		height = self.height
+		self.wire[0].pos = r
+		r = vect2d(self.pos.x + self.width/2 -5, self.pos.y + self.height/2)
+		self.wire[1].pos = r
+		r = vect2d(self.pos.x, self.pos.y + height-5)
+		self.wire[2].pos = r
+
 
 
 class world:
@@ -219,7 +214,7 @@ class world:
 		self.width = 800  
 		self.height = 600
 		self.force_que = []    #Keeps track of forces, particles, and things like spring constants, etc
-		self.g = vect3d(0,1,0)  #Constant gravitational field constant
+		self.g = vect2d(0,1)  #Constant gravitational field constant
 		self.numerical = 'rk4'
 		self.running = True   #Determines if while look should continue
 		self.selected = None   #Particle selected with the mouse
@@ -301,11 +296,6 @@ class world:
 		
 		for particle in self.particle_list:#Iterate through each particle and draw it
 			particle.draw(self.screen)
-		
-		pygame.draw.aalines(self.screen, (255,0,0), True, [(0,0), (self.width/2,0), (self.width/2, self.height/2), (0,self.height/2)], True)
-		pygame.draw.aalines(self.screen, (255,0,0), True, [(0,self.height/2), (self.width/2,self.height/2), (self.width/2,self.height), (0,self.height)], True)
-		pygame.draw.aalines(self.screen, (255,0,0), True, [(self.width/2,0), (self.width,0), (self.width,self.height/2), (self.width/2,self.height/2)], True)
-		
 
 		pygame.display.flip()#Display the screen
 
@@ -467,10 +457,12 @@ class world:
 	def mouse_pull(self,particle):
 		"""Force applied by selecting particle with mouse"""
 		(pick_x,pick_y) = pygame.mouse.get_pos()
-		mouse_pos = vect3d(pick_x,pick_y,0)
-		dx = self.selected.pos - mouse_pos
+		mouse_pos = vect2d(pick_x,pick_y)
+		self.selected.pos.x = mouse_pos.x
+		self.selected.pos.y = mouse_pos.y
+		"""dx = self.selected.pos - mouse_pos
 		F = -self.mouse_force*dx - self.selected.vel*self.damping
-		self.selected.add_force(F)
+		self.selected.add_force(F)"""
 
 
 
@@ -484,7 +476,7 @@ class world:
 				self.running = False
 			if event.type == pygame.MOUSEBUTTONDOWN:
 				(pick_x,pick_y) = pygame.mouse.get_pos()   #Get mouse position on screen
-				picked = vect3d(pick_x,pick_y,0)  #Turn mouse position into a vector
+				picked = vect2d(pick_x,pick_y)  #Turn mouse position into a vector
 				for i in self.particle_list:
 					dist = i.pos - picked   #How far the mouse is from the center of a particle
 					if dist.mag() < i.size:  #If mouse click is inside circle
@@ -520,7 +512,7 @@ class collision_engine():
 				rc = contact[0].getContactGeomParams()[0]
 				n_hat = contact[0].getContactGeomParams()[1]
 				dx = contact[0].getContactGeomParams()[2]
-				self.resolve_collision_ode(p[0], p[1], vect3d(rc[0], rc[1],0), vect3d(n_hat[0], n_hat[1],0), dx, contact)
+				#self.resolve_collision_ode(p[0], p[1], vect2d(rc[0], rc[1]), vect2d(n_hat[0], n_hat[1]), dx, contact)
 
 	def bounding_sphere(self,particle1,particle2):
 		"""Check for overlap using bounding spheres"""
@@ -576,9 +568,9 @@ class collision_engine():
 				part = p1
 
 			r_c -= rect.pos
-			r_c_perp = vect3d(-r_c.y, r_c.x,0)
+			r_c_perp = vect2d(-r_c.y, r_c.x)
 			#velocity of the contact point
-			#v_c = vect3d(rec,0t.vel.x + rect.omega*r_c_perp.x, rect.vel.y + rect.omega * r_c_perp.y)
+			#v_c = vect2d(rect.vel.x + rect.omega*r_c_perp.x, rect.vel.y + rect.omega * r_c_perp.y)
 			v_c = rect.vel + (rect.omega * r_c_perp)
 			#Relative velocity between contact point and particle
 			v_rel = v_c - part.vel
@@ -606,8 +598,8 @@ class collision_engine():
 		#rigid body vs rigid body collision
 		elif p1.shape == "rectangle" and p2.shape == "rectangle":
 			
-			dv1 = vect3d(0,0,0)
-			dv2 = vect3d(0,0,0)
+			dv1 = vect2d(0,0)
+			dv2 = vect2d(0,0)
 			dw1 = 0
 			dw2 = 0
 			contact_num = int(len(contact)/2)#The number of contact points in this collision
@@ -618,14 +610,14 @@ class collision_engine():
 				rc = contact[i].getContactGeomParams()[0]
 				n_hat = contact[i].getContactGeomParams()[1]
 				dx = contact[i].getContactGeomParams()[2]
-				r_c = vect3d(rc[0], rc[1],0)
-				n_hat = vect3d(n_hat[0], n_hat[1],0)
+				r_c = vect2d(rc[0], rc[1])
+				n_hat = vect2d(n_hat[0], n_hat[1])
 
 				#Get relative contact points for each rectangle along with the contact perps
 				r_c1 = r_c - p1.pos
 				r_c2 = r_c - p2.pos
-				r_c_perp1 = vect3d(-r_c1.y, r_c1.x,0)
-				r_c_perp2 = vect3d(-r_c2.y, r_c2.x,0)
+				r_c_perp1 = vect2d(-r_c1.y, r_c1.x)
+				r_c_perp2 = vect2d(-r_c2.y, r_c2.x)
 
 				#Velocities of the contact points
 				v_c1 = p1.vel + (p1.omega * r_c_perp1)
@@ -703,11 +695,11 @@ class collision_engine():
 
 				#Find collision point
 				#Find relative location of the particle to the rectangle
-				r_c = vect3d(0,0,0)
-				hat = vect3d(0,0,0)
+				r_c = vect2d(0,0)
+				hat = vect2d(0,0)
 				dx = 0
 				r_rel_world = part.pos-rect.pos
-				r_rel = vect3d(r_rel_world * rect.local_x_axis, r_rel_world * rect.local_y_axis,0)
+				r_rel = vect2d(r_rel_world * rect.local_x_axis, r_rel_world * rect.local_y_axis)
 
 				#Collided vertically
 				if r_rel.x > -rect.width/2 and r_rel.x < rect.width/2:
@@ -740,7 +732,7 @@ class collision_engine():
 				#Only option left is that we're colliding with a corner		
 				else:
 					print "corner collision"
-					r_c = vect3d(rect.width/2, rect.height/2,0)
+					r_c = vect2d(rect.width/2, rect.height/2)
 
 					if r_rel.x <= -rect.width/2:
 						r_c.x *= -1
@@ -758,10 +750,10 @@ class collision_engine():
 					
 				#contact point in world coordinates
 				r_c = r_c.x * rect.local_x_axis.norm() + r_c.y * rect.local_y_axis.norm()
-				r_c_perp = vect3d(-r_c.y, r_c.x,0)
+				r_c_perp = vect2d(-r_c.y, r_c.x)
 				#velocity of the contact point
 				#v_c = rect.vel + r_c_perp * rect.omega
-				v_c = vect3d(rect.vel.x - rect.omega*r_c_perp.y, rect.vel.y + rect.omega * r_c_perp.x,0)
+				v_c = vect2d(rect.vel.x - rect.omega*r_c_perp.y, rect.vel.y + rect.omega * r_c_perp.x)
 				#Relative velocity between contact point and particle
 				v_rel = v_c - part.vel
 				v_close = v_rel * hat
@@ -822,12 +814,6 @@ class collision_engine():
 			if particle.pos.y - particle.size <= 0:
 				particle.pos.y = 0 + particle.size
 				particle.vel.y = -self.cor*particle.cor*particle.vel.y
-			if particle.pos.z + particle.size >= self.world.height:
-				particle.pos.z = self.world.height - particle.size
-				particle.vel.z = -self.cor*particle.cor*particle.vel.y
-			if particle.pos.z - particle.size <= 0:
-				particle.pos.z = 0 + particle.size
-				particle.vel.z = -self.cor*particle.cor*particle.vel.y
 
 
 	def check_rod_constraint(self,part0, part1,L):
@@ -880,44 +866,17 @@ if __name__ == '__main__':
 
 	earth.set_numerical('euler')  #Change to the Velocity Verlet method
 
-
-
-	#Set to 0 for testing, just adding a bunch of particles to the system
-	num_part = 0 #Set number of particles to add to world
 	part_list = []
-	for i in range(num_part):
-		r = vect3d(randint(0, earth.width), randint(0, earth.height),0)
-		v = vect3d(randint(-10,10),randint(-10,10),0)
-		part = particle(r,v)   #Create new particle
-		part_list.append(part)    #Add to list of particles that have been randomly placed
-		earth.add_particle(part)  #Add particle to the world
 
-	#Particle for testing
-	part = particle(vect3d(250, 280,0), vect3d(.4, 0,0));
-	#part_list.append(part)
-	#earth.add_particle(part)
+	magnet = magnet(vect2d(350,200))
+	part_list.append(magnet)
+	earth.add_particle(magnet)
 
-	#2 rectangles used for testing
-	rect1 = rectangle(vect3d(100, 60,50), vect3d(2,0,0), 20, 60, 40)
-	part_list.append(rect1)
-	earth.add_particle(rect1)
-	rect2 = rectangle(vect3d(200, 65,50), vect3d(-2,0,0), 20, 60, 20)
-	part_list.append(rect2)
-	earth.add_particle(rect2)
+	coil = coil(vect2d(600, 200))
 
-	#Set to 0 for testing, adding a bunch of random rectangles to the system
-	num_rect = 0
-	for i in range(num_rect):
-		r = vect3d(randint(0, earth.width), randint(0, earth.height),0)
-		v = vect3d(randint(-20,20),randint(-20,20), randint(0,10))
-		w = randint(10, 50)
-		h = randint(10,50)
-		o = randint(-10,10)
-		rect = rectangle(r,v, w, h, 20)
-		part_list.append(rect)
-		earth.add_particle(rect)
-
+	earth.add_particle(coil)
 	#earth.new_force('const_grav',part_list)   #Particles experience gravity
+	#Leave the drag force in for use with moving the magnet around
 	earth.new_force('drag',part_list)   #particles also experience drag
 	
 	"""
