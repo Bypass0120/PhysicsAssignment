@@ -42,6 +42,7 @@ class particle:
 		self.cor = .97     #Coefficient of restitution
 		self.rod_connection={}  #NEW: Dictionary of all rod constraint connections
 		self.geom = []
+		self.initPos = vect2d(0,0)
 
 
 	def draw(self,screen, parent_pos=vect2d(0,0)):
@@ -446,6 +447,10 @@ class world:
 		mouse_pos = vect2d(pick_x,pick_y)
 		self.selected.pos.x = mouse_pos.x
 		self.selected.pos.y = mouse_pos.y
+		picked = vect2d(pick_x,pick_y)
+		initialPos = self.particle_list[0].initPos
+		print'initialPos = {}'.format(initialPos)
+		self.induction(self.particle_list, picked, initialPos)
 		"""dx = self.selected.pos - mouse_pos
 		F = -self.mouse_force*dx - self.selected.vel*self.damping
 		self.selected.add_force(F)"""
@@ -466,22 +471,24 @@ class world:
 					dist = i.pos - picked   #How far the mouse is from the center of a particle
 					if dist.mag() < i.size:  #If mouse click is inside circle
 						self.selected = i
-						self.new_force('mouse_pull',[self.selected])  #Add mouse force to force_que
+						self.new_force('mouse_pull',[(self.selected)])  #Add mouse force to force_que
 						self.selected.original_color = self.selected.color
-						self.selected.color = (255,0,0)   #Change color
-						self.induction(self.particle_list, picked)
+						self.selected.color = (255,0,0)  #Change color
+						self.particle_list[0].initPos = vect2d(self.particle_list[0].pos.x, self.particle_list[0].pos.y)
 			if event.type == pygame.MOUSEBUTTONUP and self.selected != None:
 				self.selected.color = self.selected.original_color  #change color back to original
 				self.force_que.remove(['mouse_pull',[self.selected]])   #Remove force from force_que
 				self.selected = None    #No particles are selected
 
-	def induction(self, particleList, position):
+	def induction(self, particleList, position, initPos):
 
 		"""Faraday's Law"""
+		initialB = initPos
+		initialA = vect2d(initPos.x, initPos.y + particleList[0].height/2)
 		N = len(particleList[1].wire) #Number of Wires
 		B = vect2d(position.x, position.y) #Magnetic Field Vector
 		A = vect2d(position.x, position.y + particleList[0].height/2) #Parallel Vector to B
-		PhiI = (B.x*A.x) + (B.y*A.y) #Phi's Equation (Initial) Needs to be DOT product NEEDS WORK
+		PhiI = (initialB.x*initialA.x) + (initialB.y*initialA.y) #Phi's Equation (Initial) Needs to be DOT product NEEDS WORK
 		PhiF = (B.x*A.x) + (B.y*A.y) #Phi's Equation (Final) Needs to be DOT product NEEDS WORK
 		Phidx = PhiF - PhiI #Change in Phi
 		E = -N*(Phidx/self.dt) #Number of wires*(Change in Phi / Change in time)
