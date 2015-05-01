@@ -1,8 +1,11 @@
 
 """
 Created on Mon, March 9 2015
+
 @author: Todd Zimmerman
+
 Created by Todd Zimmerman for PHYS-360 Spring 2015 at UW-Stout
+
 Template for introducing numerical methods.  Implements euler, midpoint, and the velocity verlet methods
 """
 
@@ -42,7 +45,6 @@ class particle:
 		self.cor = .97     #Coefficient of restitution
 		self.rod_connection={}  #NEW: Dictionary of all rod constraint connections
 		self.geom = []
-		self.initPos = vect2d(0,0)
 
 
 	def draw(self,screen, parent_pos=vect2d(0,0)):
@@ -55,6 +57,7 @@ class particle:
 
 	def reset_force(self):
 		"""Set net force to zero
+
 		Call this at the start of each time step to reset net forces for each particle
 		"""
 		self.f_net = vect2d(0,0) 
@@ -66,6 +69,7 @@ class particle:
 
 	def set_pos(self,new_pos):
 		"""Set the position of the particle
+
 		Make sure that new_pos is a vect2d object
 		"""
 		self.pos = new_pos
@@ -183,7 +187,6 @@ class coil(rectangle):
 			print "index: ", index
 			self.electrons.append(part)
 
-
 	def draw(self, screen):
 		self.update()
 		rectangle.draw(self, screen)
@@ -268,6 +271,7 @@ class world:
 
 	def set_numerical(self,method):
 		"""Change the self.numerical variable to use a different update method
+
 		Note that 'method' must be passed as a string
 		"""
 		self.numerical = method
@@ -285,6 +289,7 @@ class world:
 
 	def add_rod(self,part1,part2):
 		"""NEW: Adds a rod constraing between two particles with length equal to separation at initial time
+
 		The length of the rod is set to the original distance between the two particles.  Particle class
 		has new property called rod_connection.  This is a dictionary that uses the name of the particle as a key and the length of the rod 
 		as the associated value.  You may want to look up python dictionary. 
@@ -296,6 +301,7 @@ class world:
 
 	def new_force(self,force,particles):
 		"""Add a force to the list of forces calculated
+
 		'particles' should be a list of all particles experiencing the force.  Some
 		forces require other parameters and those should be included in the 'particles' list
 		(e.g. see spring force defintion below)
@@ -305,6 +311,7 @@ class world:
 
 	def update(self):
 		"""Update the positions and velocities of all particles
+
 		Should also include boundary(), self.game_controls(), self.v_max_check(),
 		and should use getattr() to call the numerical method used to solve
 		the equations of motion.
@@ -366,6 +373,7 @@ class world:
 
 	def projectile(self):
 		"""Updates the position of a particle moving with a constant net force
+
 		Make sure that other position update methods are not called at the same time
 		as this one (e.g. either projectile() or move(), not both).
 		"""
@@ -377,6 +385,7 @@ class world:
 
 	def rk4(self):
 		"""Update the position and velocity using rk4
+
 		Will need to use particle.get_force() method and particle.set_pos() at different points to 
 		return the net force on each particle and set the positions before calling self.net_force().
 		Store k and L results (use capital L so it isn't confused with number one)"""
@@ -434,6 +443,7 @@ class world:
 
 	def net_force(self):
 		"""Find net force for all particles
+
 		Set net force for each particle to zero at start of the time setup_world
 		and then run through the force_que to find net force on each particle
 		"""
@@ -445,6 +455,7 @@ class world:
 
 	def const_grav(self,particles):
 		"""Constant gravitational field
+
 		Don't forget that the gravitational FORCE depends on the mass
 		"""
 		for i in particles:
@@ -453,6 +464,7 @@ class world:
 
 	def drag(self,particles):
 		"""Apply drag force to particles
+
 		Drag force only kicks in when particle speed exceeds self.vel_max.
 		Drag force is opposite direction of velocity and should scale as
 		the square of the speed
@@ -463,6 +475,7 @@ class world:
 
 	def spring(self,particles):
 		"""Spring force between two particles
+
 		Assumes only two particles are passed.  If you have more than
 		two particles you will need to midify the code.  The argument 'particles' should be a
 		list containing the two particles, the spring constant, and the relaxed separation distance
@@ -480,10 +493,6 @@ class world:
 		mouse_pos = vect2d(pick_x,pick_y)
 		self.selected.pos.x = mouse_pos.x
 		self.selected.pos.y = mouse_pos.y
-		picked = vect2d(pick_x,pick_y)
-		initialPos = self.particle_list[0].initPos
-		print'initialPos = {}'.format(initialPos)
-		self.induction(self.particle_list, picked, initialPos)
 		"""dx = self.selected.pos - mouse_pos
 		F = -self.mouse_force*dx - self.selected.vel*self.damping
 		self.selected.add_force(F)"""
@@ -492,6 +501,7 @@ class world:
 
 	def game_controls(self):
 		"""Handles all mouse and keyboard events
+
 		Call this in the update() method
 		"""
 		for event in pygame.event.get(): 
@@ -504,38 +514,13 @@ class world:
 					dist = i.pos - picked   #How far the mouse is from the center of a particle
 					if dist.mag() < i.size:  #If mouse click is inside circle
 						self.selected = i
-						self.new_force('mouse_pull',[(self.selected)])  #Add mouse force to force_que
+						self.new_force('mouse_pull',[self.selected])  #Add mouse force to force_que
 						self.selected.original_color = self.selected.color
-						self.selected.color = (255,0,0)  #Change color
-						self.particle_list[0].initPos = vect2d(self.particle_list[0].pos.x, self.particle_list[0].pos.y)
+						self.selected.color = (255,0,0)   #Change color
 			if event.type == pygame.MOUSEBUTTONUP and self.selected != None:
 				self.selected.color = self.selected.original_color  #change color back to original
 				self.force_que.remove(['mouse_pull',[self.selected]])   #Remove force from force_que
 				self.selected = None    #No particles are selected
-
-	def induction(self, particleList, position, initPos):
-
-		"""Faraday's Law"""
-		initialB = initPos
-		initialA = vect2d(initPos.x, initPos.y + particleList[0].height/2)
-		N = len(particleList[1].wire) #Number of Wires
-		B = vect2d(position.x, position.y) #Magnetic Field Vector
-		A = vect2d(position.x, position.y + particleList[0].height/2) #Parallel Vector to B
-		PhiI = (initialB.x*initialA.x) + (initialB.y*initialA.y) #Phi's Equation (Initial) Needs to be DOT product NEEDS WORK
-		PhiF = (B.x*A.x) + (B.y*A.y) #Phi's Equation (Final) Needs to be DOT product NEEDS WORK
-		Phidx = PhiF - PhiI #Change in Phi
-		E = -N*(Phidx/self.dt) #Number of wires*(Change in Phi / Change in time)
-
-		print'E = {} N = {} B = {} A = {} PhiI = {} PhiF = {} Phidx = {}'.format(E, N, B, A, PhiI, PhiF, Phidx)
-		
-		"""Lenz's Law"""
-		q = 1 #charge of particle
-		EF = -1 #Electric Field
-		v = B #original vector (Affected by Force)
-		MF = B #magnetic Field Vector
-		F = q*(EF + (v*MF)) #Force Equation
-
-		print'F = {}'.format(F)
 
 
 class collision_engine():
@@ -549,6 +534,7 @@ class collision_engine():
 
 	def find_collision(self):
 		"""EDIT: Runs through all particles in particle_list to look for overlapping particles
+
 		Needs to check and see if particle has a rod connection and if it does, call check_rod_constraint
 		"""
 		self.has_collided = []   #Reset collisions
@@ -845,6 +831,7 @@ class collision_engine():
 
 	def boundary(self):
 		"""Checks to see if part of a particle leaves the screen.  Should shift particle back on to screen and reverse component of velocity
+
 		This method has been moved from the world class.  It makes more sense to have it be part of the collision engine
 		"""
 		for particle in self.particle_list:
@@ -864,6 +851,7 @@ class collision_engine():
 
 	def check_rod_constraint(self,part0, part1,L):
 		"""NEW: Check to see if particles are too close or too far apart.  Call fix_rod_constraint if Needed
+
 		L is the length of the rod.  To get the length L you will need to use part0.rod_connection[part1].  This uses the rod_connection dictionary to look
 		up the associated value, which is the rod length L.
 		You will need to calculate the vector along the rod (hat) and
@@ -877,6 +865,7 @@ class collision_engine():
 
 	def fix_rod_constraint(self,part0,part1,L,hat,dist):
 		"""NEW: Move particle and change velocity so rod constraints are maintained
+
 		L is length of rod, hat is the vector pointing along the rod, and dist is the
 		current distance between the particles.  You can use the same impulse equations
 		used during collisions to change the velocities.  To move the particles use the 
@@ -935,3 +924,4 @@ if __name__ == '__main__':
 	while earth.running:   
 		time_passed = earth.clock.tick(120)   #Add pygame.time.Clock() to world setup.  This will allow you to set fps
 		earth.update()
+
