@@ -136,7 +136,77 @@ class rectangle(particle):
 class magnet(rectangle):
 	def __init__(self, pos):
 		rectangle.__init__(self, pos, vect2d(0,0), 100, 20)
-		self.magnet_strength = 0
+		self.north_pole_pos = vect2d(self.pos.x + self.width/2, self.pos.y)
+		self.magnet_strength = 1
+		self.field_lines = []
+		samples = 22
+		for i in range(0,samples):
+			for j in range(0,samples):
+				self.field_lines.append(field_Line(vect2d(800/samples*i + 20, 600/samples*j + 20)))
+
+	def draw(self, screen):
+		self.update()
+		rectangle.draw(self,screen)
+		for i in self.field_lines:
+			i.draw(screen)
+
+	def update(self):
+		for i in self.field_lines:
+			#relative vectors for positive and negative poles
+			rp = i.pos - (self.pos + (self.width/2)*self.local_x_axis)
+			rn = i.pos - (self.pos - (self.width/2)*self.local_x_axis)
+			#magnetic strength vectors for positive and negative poles
+			mp = self.magnet_strength*rp.norm()
+			mn = -self.magnet_strength*rn.norm()
+			#influence on the force of the sampling point for each pole
+			"""
+			print "mp: ", mp
+			print "rp: ", rp
+			print "rp.mag(): ", rp.mag()
+			print "rp.mage()**3: ", rp.mag()**3
+			"""
+			i.f =  1/4*math.pi * (((3*rp*(mp*rp))/rp.mag()**5) - mp/rp.mag()**3)
+			i.f += 1/4*math.pi * (((3*rn*(mn*rn))/rn.mag()**5) - mn/rn.mag()**3)
+			
+			#This isn't really needed but just normalizes the force vector
+			norm = i.f.norm()
+			
+			#Fine the angle of the force vector
+			if norm.x != 0:
+				i.theta = math.atan(norm.y/norm.x)
+			if norm.x < 0:
+				i.theta += math.pi
+			
+
+class field_Line(rectangle):
+	def __init__(self, pos):
+		rectangle.__init__(self, pos, vect2d(0,0), 20,10)
+		self.color = (210, 210, 210) #210
+		self.f = vect2d(0,0)
+		self.theta = 0;
+		self.mesh = [vect2d(-5, 0), vect2d(5,0), vect2d(2.5, -2.5), vect2d(2.5, 2.5)]
+
+	def draw(self, screen):
+		#rectangle.draw(self, screen)
+		self.local_x_axis = vect2d(math.cos(self.theta), math.sin(self.theta))
+		self.local_y_axis = vect2d(-math.sin(self.theta), math.cos(self.theta))
+		
+		vCorners= [self.mesh[0].x*self.local_x_axis + self.mesh[0].y*self.local_y_axis,
+		self.mesh[1].x*self.local_x_axis + self.mesh[1].y*self.local_y_axis,
+		self.mesh[2].x*self.local_x_axis + self.mesh[2].y*self.local_y_axis,
+		self.mesh[3].x*self.local_x_axis + self.mesh[3].y*self.local_y_axis]
+		
+		corners = [[vCorners[0].x + self.pos.x, vCorners[0].y + self.pos.y],
+					[vCorners[1].x + self.pos.x, vCorners[1].y + self.pos.y],
+					[vCorners[2].x + self.pos.x, vCorners[2].y + self.pos.y],
+					[vCorners[1].x + self.pos.x, vCorners[1].y + self.pos.y],
+					[vCorners[3].x + self.pos.x, vCorners[3].y + self.pos.y]]
+
+		pygame.draw.aalines(screen, self.color, False, corners, 1)
+
+	def set_f(self, force):
+		self.f = force
+
 
 class coil(rectangle):
 	def __init__(self, pos):
@@ -145,6 +215,8 @@ class coil(rectangle):
 		self.wire = []
 		self.electrons = []
 		self.electron_path = []
+		self.mag_f = vect2d(0,0)
+		self.mag_f_old = vect2d(0,0)
 		
 		#Add visual representation for the wire not in the coil
 		r = vect2d(self.pos.x - self.width/2 + 5, self.pos.y + self.height/2)
@@ -174,13 +246,19 @@ class coil(rectangle):
 			self.electron_path.append(vect2d( - self.width/2 + 5, 15+(4-i)*(self.wire[0].height-15)/5))
 
 		#Add electrons to the system
-		num_electrons = 75
+		num_electrons = 5
 		for i in range(0, num_electrons):
-			index = (int)(i*len(self.electron_path)/num_electrons)
-			r = self.electron_path[index]
+			index = (i*len(self.electron_path)/num_electrons)
+			r = self.electron_path[(int)(index)]
+			remainder = index - (int)(index)
+			direction = vect2d(0,0)
+			if (int)(index) == len(self.electron_path):
+				direction = self.electron_path[1] - self.electron_path[0]
+			else:
+				direction = self.electron_path[1+(int)(index)] - self.electron_path[(int)(index)]
+			r += remainder * direction
 			part = particle(r, vect2d(0,0), 1, 5)
-			part.path_index = index
-			print "index: ", index
+			part.path_index = (int)(index)
 			self.electrons.append(part)
 
 
@@ -202,7 +280,7 @@ class coil(rectangle):
 		r = vect2d(self.pos.x, self.pos.y + height-5)
 		self.wire[2].pos = r
 
-		self.induction(.25)
+		#self.induction(.6)
 
 	def induction(self, mag=1):
 		for i in self.electrons:
@@ -210,8 +288,10 @@ class coil(rectangle):
 			#Find the normal going to the next path point
 			if mag > 0:
 				charge = 1
-			else:
+			elif mag < 0:
 				charge = -1
+			else:
+				return
 
 			#Prevent out of bounds indexing
 			nextIndex = -1
@@ -312,9 +392,9 @@ class world:
 		self.net_force()
 		self.game_controls()
 		getattr(self,self.numerical)()  #Solve equations of motion
-		self.collision.find_collision()  #Check to see if object hits the walls
+		self.induction()
+		#self.collision.find_collision()  #Check to see if object hits the walls
 		self.display()
-
 
 	def display(self):
 		"""Draw all particles onto the surface and then flip to computer screen"""
@@ -482,8 +562,8 @@ class world:
 		self.selected.pos.y = mouse_pos.y
 		picked = vect2d(pick_x,pick_y)
 		initialPos = self.particle_list[0].initPos
-		print'initialPos = {}'.format(initialPos)
-		self.induction(self.particle_list, picked, initialPos)
+		#print'initialPos = {}'.format(initialPos)
+		#self.induction(self.particle_list, picked, initialPos)
 		"""dx = self.selected.pos - mouse_pos
 		F = -self.mouse_force*dx - self.selected.vel*self.damping
 		self.selected.add_force(F)"""
@@ -513,29 +593,62 @@ class world:
 				self.force_que.remove(['mouse_pull',[self.selected]])   #Remove force from force_que
 				self.selected = None    #No particles are selected
 
-	def induction(self, particleList, position, initPos):
+	def induction(self):
+		magnet = self.particle_list[0]
+		coil = self.particle_list[1]
 
 		"""Faraday's Law"""
-		initialB = initPos
-		initialA = vect2d(initPos.x, initPos.y + particleList[0].height/2)
-		N = len(particleList[1].wire) #Number of Wires
-		B = vect2d(position.x, position.y) #Magnetic Field Vector
-		A = vect2d(position.x, position.y + particleList[0].height/2) #Parallel Vector to B
+		N = coil.num_loops #Number of Wires
+		A = vect2d(-1,0) #Area vector
+		dB = vect2d(0,0) #Change in magnetic field
+		result = 0;
+		#Sample the magnetic field in the coils area to find its magnetic field vector
+		sampleSize = 5
+		
+		magnetic_force = vect2d(0,0)
+		for i in range(0,sampleSize):
+			for j in range(0,sampleSize):
+				#Find the sampling position
+				x = coil.pos.x + coil.width * j * (2-sampleSize)/2*sampleSize
+				y = coil.pos.y + coil.height * i * (2-sampleSize)/2*sampleSize
+				sample_pos = vect2d(x,y)
+				#relative vectors for positive and negative poles
+				rp = sample_pos - (magnet.pos + (magnet.width/2)*magnet.local_x_axis)
+				rn = sample_pos - (magnet.pos - (magnet.width/2)*magnet.local_x_axis)
+				#magnetic strength vectors for positive and negative poles
+				mp = magnet.magnet_strength*rp.norm()
+				mn = -magnet.magnet_strength*rn.norm()
+				#influence on the force of the sampling point for each pole
+				magnetic_force +=  1/4*math.pi * (((3*rp*(mp*rp))/rp.mag()**5) - mp/rp.mag()**3)
+				magnetic_force += 1/4*math.pi * (((3*rn*(mn*rn))/rn.mag()**5) - mn/rn.mag()**3)
+
+		#Find the change in magnetic flux
+		coil.mag_f = magnetic_force
+		dB = coil.mag_f - coil.mag_f_old
+		coil.mag_f_old = coil.mag_f
+
+		#Find the voltage
+		result = N * (dB * A) / self.dt
+		print "voltage: ", result
+
+		coil.induction(result)
+		"""
 		PhiI = (initialB.x*initialA.x) + (initialB.y*initialA.y) #Phi's Equation (Initial) Needs to be DOT product NEEDS WORK
 		PhiF = (B.x*A.x) + (B.y*A.y) #Phi's Equation (Final) Needs to be DOT product NEEDS WORK
 		Phidx = PhiF - PhiI #Change in Phi
 		E = -N*(Phidx/self.dt) #Number of wires*(Change in Phi / Change in time)
 
 		print'E = {} N = {} B = {} A = {} PhiI = {} PhiF = {} Phidx = {}'.format(E, N, B, A, PhiI, PhiF, Phidx)
-		
+		"""
 		"""Lenz's Law"""
+		"""
 		q = 1 #charge of particle
 		EF = -1 #Electric Field
 		v = B #original vector (Affected by Force)
 		MF = B #magnetic Field Vector
 		F = q*(EF + (v*MF)) #Force Equation
 
-		print'F = {}'.format(F)
+		print'F = {}'.format(F)"""
 
 
 class collision_engine():
@@ -913,6 +1026,9 @@ if __name__ == '__main__':
 	part_list = []
 
 	magnet = magnet(vect2d(350,200))
+	magnet.omega = .5
+	#Ok so this is way to high but I wanted results...  
+	magnet.magnet_strength = 10000000000000
 	part_list.append(magnet)
 	earth.add_particle(magnet)
 
