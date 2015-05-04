@@ -1,4 +1,3 @@
-
 """
 Created on Mon, March 9 2015
 @author: Todd Zimmerman
@@ -101,7 +100,6 @@ class rectangle(particle):
 	def find_corners(self):
 		lX = self.width/2*self.local_x_axis
 		lY = self.height/2*self.local_y_axis
-
 		vCorners = [-lX -lY, lX-lY, lX+lY, -lX+lY]
 		corners = [[vCorners[0].x + self.pos.x, vCorners[0].y + self.pos.y],
 					[vCorners[1].x + self.pos.x, vCorners[1].y + self.pos.y],
@@ -333,11 +331,13 @@ class world:
 		self.vel_max = 50     #Velocity at which the drag force kicks in
 		self.rod_color=(120,120,0)  #NEW: Used for color of connecting rods
 		self.setup_world()   #Create the pygame window
+		self.result = 0;
 
 
 	def setup_world(self):
 		"""Create a pygame window"""
 		pygame.init()
+
 		self.screen = pygame.display.set_mode((self.width,self.height))
 		pygame.display.set_caption('PHYS-360 Homework 7')
 		self.screen.fill(self.background_color)
@@ -402,6 +402,9 @@ class world:
 		
 		for particle in self.particle_list:#Iterate through each particle and draw it
 			particle.draw(self.screen)
+		myfont = pygame.font.SysFont("comicsansms", 12)
+		label = myfont.render("Voltage: {}".format(self.result), True, (0, 0, 0))
+		self.screen.blit(label, (5,0))
 
 		pygame.display.flip()#Display the screen
 
@@ -631,13 +634,15 @@ class world:
 		result = N * (dB * A) / self.dt
 		print "voltage: ", result
 
+		self.result = result
+
+
 		coil.induction(result)
 		"""
 		PhiI = (initialB.x*initialA.x) + (initialB.y*initialA.y) #Phi's Equation (Initial) Needs to be DOT product NEEDS WORK
 		PhiF = (B.x*A.x) + (B.y*A.y) #Phi's Equation (Final) Needs to be DOT product NEEDS WORK
 		Phidx = PhiF - PhiI #Change in Phi
 		E = -N*(Phidx/self.dt) #Number of wires*(Change in Phi / Change in time)
-
 		print'E = {} N = {} B = {} A = {} PhiI = {} PhiF = {} Phidx = {}'.format(E, N, B, A, PhiI, PhiF, Phidx)
 		"""
 		"""Lenz's Law"""
@@ -647,7 +652,6 @@ class world:
 		v = B #original vector (Affected by Force)
 		MF = B #magnetic Field Vector
 		F = q*(EF + (v*MF)) #Force Equation
-
 		print'F = {}'.format(F)"""
 
 
